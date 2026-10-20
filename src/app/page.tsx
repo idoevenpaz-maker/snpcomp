@@ -23,6 +23,7 @@ import {
   computePerformanceTable,
   PORTFOLIO_KEY,
 } from '@/lib/finance-math';
+import { fetchStocksClient } from '@/lib/client-fetch';
 import {
   ComparisonMode,
   MetricType,
@@ -111,23 +112,14 @@ export default function HomePage() {
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams({
-          tickers: currentTickers.join(','),
-          startDate: start,
-          endDate: end,
-        });
-        const res = await fetch(`/api/stocks?${params.toString()}`);
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(errJson.error || `HTTP ${res.status}`);
-        }
-        const json: StockApiResponse = await res.json();
+        // Static GitHub Pages build: load pre-fetched Yahoo Finance close prices
+        const json: StockApiResponse = await fetchStocksClient(currentTickers, start, end);
         setApiData(json);
 
         if (json.invalidTickers && json.invalidTickers.length > 0) {
           const badList = json.invalidTickers.join(', ');
           setInvalidTickerNotice(
-            `Ticker${json.invalidTickers.length > 1 ? 's' : ''} not found on Yahoo Finance and removed: ${badList}`
+            `Ticker${json.invalidTickers.length > 1 ? 's' : ''} not available and removed: ${badList}. To add new stocks, list them in tickers.txt in the GitHub repo.`
           );
           setTickers((prev) => {
             const next = prev.filter((t) => !json.invalidTickers!.includes(t));

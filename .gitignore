@@ -6,3 +6,6 @@ dist/
 .vercel/
 *.tsbuildinfo
 next-env.d.ts
+
+# Generated price data (built by GitHub Actions)
+public/data/
