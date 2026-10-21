@@ -31,7 +31,7 @@ import {
   STOCK_COLORS,
   VXUS_COLOR,
 } from '@/lib/finance-math';
-import { ComparisonMode, MetricType, TimeframePreset } from '@/lib/types';
+import { BenchmarkView, ComparisonMode, MetricType, TimeframePreset } from '@/lib/types';
 
 const TIMEFRAME_PRESETS: TimeframePreset[] = ['1M', '6M', 'YTD', '1Y', '3Y', '5Y', 'MAX'];
 
@@ -46,6 +46,8 @@ interface PerformanceChartProps {
   showVxus: boolean;
   /** e.g. "SPY 60% · VXUS 40%"; null hides the combined benchmark line */
   combinedLabel: string | null;
+  benchView: BenchmarkView;
+  onBenchViewChange: (view: BenchmarkView) => void;
   mode: ComparisonMode;
   onModeChange: (mode: ComparisonMode) => void;
   timeframe: TimeframePreset;
@@ -178,6 +180,8 @@ export default function PerformanceChart({
   showNasdaq,
   showVxus,
   combinedLabel,
+  benchView,
+  onBenchViewChange,
   mode,
   onModeChange,
   timeframe,
@@ -312,6 +316,36 @@ export default function PerformanceChart({
           >
             <Layers className="w-3.5 h-3.5" />
             Plot Combined Portfolio
+          </button>
+        </div>
+
+        {/* Benchmarks: separate SPY/QQQ/VXUS lines vs one blended line */}
+        <div className="inline-flex bg-white p-1 rounded-xl border-2 border-indigo-200 shadow-sm">
+          <button
+            type="button"
+            onClick={() => onBenchViewChange('separate')}
+            className={clsx(
+              'px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all',
+              benchView === 'separate'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            )}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            Plot Separate Benchmarks
+          </button>
+          <button
+            type="button"
+            onClick={() => onBenchViewChange('combined')}
+            className={clsx(
+              'px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all',
+              benchView === 'combined'
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            )}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            Plot Combined Benchmark
           </button>
         </div>
 
