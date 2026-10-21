@@ -15,12 +15,14 @@ import {
   Compass,
 } from 'lucide-react';
 import clsx from 'clsx';
-import ControlsBar from '@/components/ControlsBar';
+import ControlsBar, { BenchmarkMixWeights } from '@/components/ControlsBar';
 import PerformanceChart from '@/components/PerformanceChart';
 import PerformanceTable from '@/components/PerformanceTable';
 import {
+  BenchmarkMix,
   buildNormalizedChartData,
   computePerformanceTable,
+  describeBenchmarkMix,
   PORTFOLIO_KEY,
 } from '@/lib/finance-math';
 import { fetchStocksClient } from '@/lib/client-fetch';
@@ -94,6 +96,12 @@ export default function HomePage() {
   const [showSp500, setShowSp500] = useState<boolean>(true);
   const [showNasdaq, setShowNasdaq] = useState<boolean>(true);
   const [showVxus, setShowVxus] = useState<boolean>(true);
+  const [showCombined, setShowCombined] = useState<boolean>(false);
+  const [benchMixWeights, setBenchMixWeights] = useState<BenchmarkMixWeights>({
+    sp500: 60,
+    nasdaq: 0,
+    vxus: 40,
+  });
   const [mode, setMode] = useState<ComparisonMode>('portfolio');
   const [timeframe, setTimeframe] = useState<TimeframePreset>('1Y');
   const [metric, setMetric] = useState<MetricType>('percentage');
@@ -240,6 +248,16 @@ export default function HomePage() {
   const nasdaqSymbol = apiData?.benchmarks.nasdaq ?? 'QQQ';
   const vxusSymbol = apiData?.benchmarks.vxus ?? 'VXUS';
 
+  // Blended benchmark (symbol -> weight %), only when the Combined Mix toggle is on
+  const benchmarkMix = useMemo<BenchmarkMix | undefined>(() => {
+    if (!showCombined) return undefined;
+    return {
+      [sp500Symbol]: benchMixWeights.sp500,
+      [nasdaqSymbol]: benchMixWeights.nasdaq,
+      [vxusSymbol]: benchMixWeights.vxus,
+    };
+  }, [showCombined, benchMixWeights, sp500Symbol, nasdaqSymbol, vxusSymbol]);
+
   const chartData = useMemo(() => {
     if (!apiData) return [];
     return buildNormalizedChartData(
@@ -250,9 +268,10 @@ export default function HomePage() {
       vxusSymbol,
       metric,
       weights,
-      initialCapital
+      initialCapital,
+      benchmarkMix
     );
-  }, [apiData, sp500Symbol, nasdaqSymbol, vxusSymbol, metric, weights, initialCapital]);
+  }, [apiData, sp500Symbol, nasdaqSymbol, vxusSymbol, metric, weights, initialCapital, benchmarkMix]);
 
   const performanceRows = useMemo(() => {
     if (!apiData) return [];
@@ -263,9 +282,10 @@ export default function HomePage() {
       nasdaqSymbol,
       vxusSymbol,
       weights,
-      initialCapital
+      initialCapital,
+      benchmarkMix
     );
-  }, [apiData, sp500Symbol, nasdaqSymbol, vxusSymbol, weights, initialCapital]);
+  }, [apiData, sp500Symbol, nasdaqSymbol, vxusSymbol, weights, initialCapital, benchmarkMix]);
 
   // Summary KPI Cards
   const portfolioRow = performanceRows.find((r) => r.symbol === PORTFOLIO_KEY);
@@ -343,6 +363,10 @@ export default function HomePage() {
           onToggleNasdaq={() => setShowNasdaq((v) => !v)}
           showVxus={showVxus}
           onToggleVxus={() => setShowVxus((v) => !v)}
+          showCombined={showCombined}
+          onToggleCombined={() => setShowCombined((v) => !v)}
+          benchMix={benchMixWeights}
+          onBenchMixChange={setBenchMixWeights}
         />
 
         {/* Dynamic IPO Start Date Adjustment Banner */}
@@ -593,6 +617,7 @@ export default function HomePage() {
           showSp500={showSp500}
           showNasdaq={showNasdaq}
           showVxus={showVxus}
+          combinedLabel={benchmarkMix ? describeBenchmarkMix(benchmarkMix) : null}
           mode={mode}
           onModeChange={setMode}
           timeframe={timeframe}
