@@ -27,6 +27,7 @@ import {
 } from '@/lib/finance-math';
 import { fetchStocksClient } from '@/lib/client-fetch';
 import {
+  BenchmarkView,
   ComparisonMode,
   MetricType,
   StockApiResponse,
@@ -97,6 +98,20 @@ export default function HomePage() {
   const [showNasdaq, setShowNasdaq] = useState<boolean>(true);
   const [showVxus, setShowVxus] = useState<boolean>(true);
   const [showCombined, setShowCombined] = useState<boolean>(false);
+  const [benchView, setBenchView] = useState<BenchmarkView>('separate');
+
+  const handleToggleCombined = () => {
+    const next = !showCombined;
+    setShowCombined(next);
+    if (!next) setBenchView('separate');
+  };
+
+  // "Plot Combined Benchmark" shows only the blended line (and turns it on)
+  const handleBenchViewChange = (view: BenchmarkView) => {
+    setBenchView(view);
+    if (view === 'combined') setShowCombined(true);
+  };
+  const isCombinedView = benchView === 'combined';
   const [benchMixWeights, setBenchMixWeights] = useState<BenchmarkMixWeights>({
     sp500: 60,
     nasdaq: 0,
@@ -364,7 +379,7 @@ export default function HomePage() {
           showVxus={showVxus}
           onToggleVxus={() => setShowVxus((v) => !v)}
           showCombined={showCombined}
-          onToggleCombined={() => setShowCombined((v) => !v)}
+          onToggleCombined={handleToggleCombined}
           benchMix={benchMixWeights}
           onBenchMixChange={setBenchMixWeights}
         />
@@ -614,10 +629,12 @@ export default function HomePage() {
           sp500Symbol={sp500Symbol}
           nasdaqSymbol={nasdaqSymbol}
           vxusSymbol={vxusSymbol}
-          showSp500={showSp500}
-          showNasdaq={showNasdaq}
-          showVxus={showVxus}
+          showSp500={showSp500 && !isCombinedView}
+          showNasdaq={showNasdaq && !isCombinedView}
+          showVxus={showVxus && !isCombinedView}
           combinedLabel={benchmarkMix ? describeBenchmarkMix(benchmarkMix) : null}
+          benchView={benchView}
+          onBenchViewChange={handleBenchViewChange}
           mode={mode}
           onModeChange={setMode}
           timeframe={timeframe}
