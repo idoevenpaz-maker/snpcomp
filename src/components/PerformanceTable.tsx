@@ -11,6 +11,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { PerformanceRow } from '@/lib/types';
+import { COMBINED_BENCH_KEY } from '@/lib/finance-math';
 
 interface PerformanceTableProps {
   rows: PerformanceRow[];
@@ -173,6 +174,8 @@ export default function PerformanceTable({
         <td className="py-3.5 px-4 text-right text-slate-700 whitespace-nowrap">
           {row.type === 'portfolio' ? (
             <span className="text-sky-700 font-semibold text-xs">Weighted Basket</span>
+          ) : row.symbol === COMBINED_BENCH_KEY ? (
+            <span className="text-slate-700 font-semibold text-xs">Blended Benchmarks</span>
           ) : (
             <>
               <span className="text-slate-500">${row.startPrice.toFixed(2)}</span>

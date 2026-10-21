@@ -22,6 +22,8 @@ import {
 } from 'recharts';
 import {
   ChartDataPoint,
+  COMBINED_BENCH_COLOR,
+  COMBINED_BENCH_KEY,
   NASDAQ_COLOR,
   PORTFOLIO_COLOR,
   PORTFOLIO_KEY,
@@ -42,6 +44,8 @@ interface PerformanceChartProps {
   showSp500: boolean;
   showNasdaq: boolean;
   showVxus: boolean;
+  /** e.g. "SPY 60% · VXUS 40%"; null hides the combined benchmark line */
+  combinedLabel: string | null;
   mode: ComparisonMode;
   onModeChange: (mode: ComparisonMode) => void;
   timeframe: TimeframePreset;
@@ -72,6 +76,7 @@ interface CustomTooltipProps {
   sp500Symbol: string;
   nasdaqSymbol: string;
   vxusSymbol: string;
+  combinedLabel: string | null;
 }
 
 function CustomSortedTooltip({
@@ -83,6 +88,7 @@ function CustomSortedTooltip({
   sp500Symbol,
   nasdaqSymbol,
   vxusSymbol,
+  combinedLabel,
 }: CustomTooltipProps) {
   if (!active || !payload || payload.length === 0) return null;
 
@@ -94,6 +100,7 @@ function CustomSortedTooltip({
     if (key === sp500Symbol) return `S&P 500 (${sp500Symbol})`;
     if (key === nasdaqSymbol) return `Nasdaq (${nasdaqSymbol})`;
     if (key === vxusSymbol) return `Intl Ex-US (${vxusSymbol})`;
+    if (key === COMBINED_BENCH_KEY) return `Combined (${combinedLabel ?? 'mix'})`;
     return key;
   };
 
@@ -121,7 +128,8 @@ function CustomSortedTooltip({
           const isBenchmark =
             item.dataKey === sp500Symbol ||
             item.dataKey === nasdaqSymbol ||
-            item.dataKey === vxusSymbol;
+            item.dataKey === vxusSymbol ||
+            item.dataKey === COMBINED_BENCH_KEY;
 
           return (
             <div
@@ -169,6 +177,7 @@ export default function PerformanceChart({
   showSp500,
   showNasdaq,
   showVxus,
+  combinedLabel,
   mode,
   onModeChange,
   timeframe,
@@ -259,6 +268,16 @@ export default function PerformanceChart({
             <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-pink-100 border border-pink-300 text-pink-900 font-bold">
               <span className="w-4 border-b-2 border-dashed border-pink-600 inline-block" />
               <span>Intl ({vxusSymbol})</span>
+            </div>
+          )}
+
+          {combinedLabel && (
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-400 text-slate-900 font-bold">
+              <span
+                className="w-4 border-b-2 border-dashed inline-block"
+                style={{ borderColor: COMBINED_BENCH_COLOR }}
+              />
+              <span>Combined ({combinedLabel})</span>
             </div>
           )}
         </div>
@@ -441,6 +460,7 @@ export default function PerformanceChart({
                     sp500Symbol={sp500Symbol}
                     nasdaqSymbol={nasdaqSymbol}
                     vxusSymbol={vxusSymbol}
+                    combinedLabel={combinedLabel}
                   />
                 }
                 cursor={{
@@ -525,6 +545,21 @@ export default function PerformanceChart({
                   stroke={VXUS_COLOR}
                   strokeWidth={2.75}
                   strokeDasharray="6 4"
+                  dot={false}
+                  activeDot={{ r: 5, strokeWidth: 0 }}
+                  isAnimationActive={false}
+                />
+              )}
+
+              {/* Combined (blended) Benchmark */}
+              {combinedLabel && (
+                <Line
+                  type="monotone"
+                  dataKey={COMBINED_BENCH_KEY}
+                  name={`Combined (${combinedLabel})`}
+                  stroke={COMBINED_BENCH_COLOR}
+                  strokeWidth={3}
+                  strokeDasharray="10 4 2 4"
                   dot={false}
                   activeDot={{ r: 5, strokeWidth: 0 }}
                   isAnimationActive={false}

@@ -11,8 +11,24 @@ import {
   Wallet,
   Briefcase,
   Compass,
+  Combine,
 } from 'lucide-react';
 import { STOCK_COLORS, resolveNormalizedWeights } from '@/lib/finance-math';
+
+export type BenchmarkKey = 'sp500' | 'nasdaq' | 'vxus';
+export type BenchmarkMixWeights = Record<BenchmarkKey, number>;
+
+const MIX_FIELDS: Array<{ key: BenchmarkKey; label: string; ring: string }> = [
+  { key: 'sp500', label: 'SPY', ring: 'border-emerald-400 focus:border-emerald-600' },
+  { key: 'nasdaq', label: 'QQQ', ring: 'border-orange-400 focus:border-orange-600' },
+  { key: 'vxus', label: 'VXUS', ring: 'border-pink-400 focus:border-pink-600' },
+];
+
+const MIX_PRESETS: Array<{ label: string; weights: BenchmarkMixWeights }> = [
+  { label: '60/40 US/Intl', weights: { sp500: 60, nasdaq: 0, vxus: 40 } },
+  { label: '80/20 US/Intl', weights: { sp500: 80, nasdaq: 0, vxus: 20 } },
+  { label: 'Equal 1/3', weights: { sp500: 33.33, nasdaq: 33.33, vxus: 33.34 } },
+];
 
 const QUICK_ADD_SUGGESTIONS = [
   { symbol: 'AAPL', name: 'Apple' },
@@ -43,6 +59,10 @@ interface ControlsBarProps {
   onToggleNasdaq: () => void;
   showVxus: boolean;
   onToggleVxus: () => void;
+  showCombined: boolean;
+  onToggleCombined: () => void;
+  benchMix: BenchmarkMixWeights;
+  onBenchMixChange: (next: BenchmarkMixWeights) => void;
 }
 
 export default function ControlsBar({
@@ -61,7 +81,12 @@ export default function ControlsBar({
   onToggleNasdaq,
   showVxus,
   onToggleVxus,
+  showCombined,
+  onToggleCombined,
+  benchMix,
+  onBenchMixChange,
 }: ControlsBarProps) {
+  const mixSum = benchMix.sp500 + benchMix.nasdaq + benchMix.vxus;
   const [inputVal, setInputVal] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -424,8 +449,82 @@ export default function ControlsBar({
               <span className="w-3.5 border-b-2 border-dashed border-pink-600 inline-block" />
               Intl (VXUS)
             </button>
+
+            <button
+              type="button"
+              onClick={onToggleCombined}
+              title="Plot one blended line that mixes SPY, QQQ and VXUS by the weights you choose"
+              className={clsx(
+                'px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold border-2 flex items-center gap-2 transition-all',
+                showCombined
+                  ? 'bg-slate-800 border-slate-900 text-white shadow-sm'
+                  : 'bg-slate-50 border-slate-300 text-slate-500 hover:text-slate-800'
+              )}
+            >
+              <Combine className="w-3.5 h-3.5" />
+              Combined Mix
+            </button>
           </div>
         </div>
+
+        {/* Combined benchmark weights */}
+        {showCombined && (
+          <div className="mt-4 pt-3 border-t-2 border-emerald-100 flex flex-wrap items-center gap-3">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-700">
+              Combined mix weights:
+            </span>
+            {MIX_FIELDS.map((f) => (
+              <label key={f.key} className="flex items-center gap-1.5 text-xs font-mono font-bold text-slate-700">
+                {f.label}
+                <span className="relative flex items-center">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={5}
+                    aria-label={`${f.label} weight in combined benchmark`}
+                    value={Number(benchMix[f.key].toFixed(2))}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      onBenchMixChange({
+                        ...benchMix,
+                        [f.key]: isNaN(val) || val < 0 ? 0 : val,
+                      });
+                    }}
+                    className={clsx(
+                      'w-20 bg-white border-2 focus:outline-none rounded-lg pl-2 pr-5 py-1 text-right text-xs font-mono font-bold text-slate-800',
+                      f.ring
+                    )}
+                  />
+                  <span className="absolute right-2 text-xs font-mono font-bold text-slate-500">%</span>
+                </span>
+              </label>
+            ))}
+            <span
+              className={clsx(
+                'px-2.5 py-1 rounded-lg border-2 text-xs font-mono font-bold',
+                Math.abs(mixSum - 100) < 0.1
+                  ? 'bg-emerald-100 border-emerald-400 text-emerald-800'
+                  : 'bg-amber-100 border-amber-400 text-amber-900'
+              )}
+            >
+              Total: {mixSum.toFixed(1)}%
+              {Math.abs(mixSum - 100) >= 0.1 && ' (Normalized to 100%)'}
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {MIX_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => onBenchMixChange(p.weights)}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-mono border-2 bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-500"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
