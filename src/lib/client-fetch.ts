@@ -27,16 +27,64 @@ interface TickerFile {
 // Cache full histories per ticker (null = not available)
 const historyCache = new Map<string, Promise<Array<[string, number]> | null>>();
 
+const HISTORY_START_UNIX = Math.floor(Date.UTC(2015, 0, 1) / 1000);
+
+function loadLocalHistory(symbol: string): Promise<Array<[string, number]> | null> {
+  return fetch(`${BASE_PATH}/data/${encodeURIComponent(symbol)}.json`)
+    .then(async (res) => {
+      if (!res.ok) return null;
+      const json = (await res.json()) as TickerFile;
+      return Array.isArray(json.points) && json.points.length >= 2 ? json.points : null;
+    })
+    .catch(() => null);
+}
+
+/**
+ * Fallback for tickers that were not pre-fetched (not in tickers.txt): load the same
+ * Yahoo v8 chart data live. Yahoo blocks direct browser (CORS) requests, so the call is
+ * relayed through the r.jina.ai reader, which returns the raw JSON with CORS headers.
+ */
+async function loadLiveHistory(symbol: string): Promise<Array<[string, number]> | null> {
+  const p2 = Math.floor(Date.now() / 1000);
+  const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(
+    symbol
+  )}?period1=${HISTORY_START_UNIX}&period2=${p2}&interval=1d`;
+  const res = await fetch(`https://r.jina.ai/${yahooUrl}`, {
+    headers: { 'X-Return-Format': 'text' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const text = await res.text();
+  const start = text.indexOf('{');
+  if (start < 0) throw new Error('Unexpected response');
+  const json = JSON.parse(text.slice(start, text.lastIndexOf('}') + 1));
+  const result = json?.chart?.result?.[0];
+  if (!result) return null; // Yahoo says the symbol does not exist
+  const timestamps: number[] = result.timestamp ?? [];
+  const closes: Array<number | null> = result.indicators?.quote?.[0]?.close ?? [];
+  const byDate = new Map<string, number>();
+  timestamps.forEach((t, i) => {
+    const c = closes[i];
+    if (typeof c === 'number' && !isNaN(c) && c > 0) {
+      byDate.set(new Date(t * 1000).toISOString().slice(0, 10), Number(c.toFixed(4)));
+    }
+  });
+  const points = Array.from(byDate.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  return points.length >= 2 ? points : null;
+}
+
 function loadHistory(symbol: string): Promise<Array<[string, number]> | null> {
   let p = historyCache.get(symbol);
   if (!p) {
-    p = fetch(`${BASE_PATH}/data/${encodeURIComponent(symbol)}.json`)
-      .then(async (res) => {
-        if (!res.ok) return null;
-        const json = (await res.json()) as TickerFile;
-        return Array.isArray(json.points) ? json.points : null;
-      })
-      .catch(() => null);
+    p = loadLocalHistory(symbol).then(async (local) => {
+      if (local) return local;
+      try {
+        return await loadLiveHistory(symbol);
+      } catch {
+        // Network/proxy hiccup: don't cache the failure so a retry can succeed
+        historyCache.delete(symbol);
+        return null;
+      }
+    });
     historyCache.set(symbol, p);
   }
   return p;
