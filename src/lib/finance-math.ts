@@ -17,7 +17,38 @@ export const SP500_COLOR = '#059669'; // emerald-600
 export const NASDAQ_COLOR = '#ea580c'; // orange-600
 export const VXUS_COLOR = '#db2777'; // pink-600
 
+export const COMBINED_BENCH_COLOR = '#1e293b'; // slate-800
+
 export const PORTFOLIO_KEY = 'PORTFOLIO_EQ';
+export const COMBINED_BENCH_KEY = 'BENCH_MIX';
+
+/** Weights (%) per benchmark symbol for the blended "Combined Benchmark" line. */
+export type BenchmarkMix = Record<string, number>;
+
+/** Short label such as "SPY 60% · QQQ 20% · VXUS 20%" (weights normalized to 100%). */
+export function describeBenchmarkMix(mix: BenchmarkMix): string {
+  const symbols = Object.keys(mix);
+  const norm = resolveNormalizedWeights(symbols, mix);
+  return symbols
+    .filter((s) => (norm[s] ?? 0) > 0)
+    .map((s) => `${s} ${Math.round((norm[s] ?? 0) * 100)}%`)
+    .join(' · ');
+}
+
+/** Value ratio (P_t / P_0) of a buy-and-hold basket on one day. */
+function basketRatio(
+  prices: Record<string, number>,
+  basePrices: Record<string, number>,
+  normWeights: Record<string, number>
+): number {
+  let ratio = 0;
+  for (const [sym, w] of Object.entries(normWeights)) {
+    const p0 = basePrices[sym] || 1;
+    const pt = prices[sym] ?? p0;
+    ratio += w * (pt / p0);
+  }
+  return ratio;
+}
 
 export interface ChartDataPoint {
   date: string;
@@ -73,7 +104,8 @@ export function buildNormalizedChartData(
   vxusSymbol: string,
   metric: MetricType,
   customWeights?: Record<string, number>,
-  initialCapital: number = 10000
+  initialCapital: number = 10000,
+  benchmarkMix?: BenchmarkMix
 ): ChartDataPoint[] {
   if (!series || series.length === 0) return [];
 
@@ -82,6 +114,9 @@ export function buildNormalizedChartData(
     new Set([...userTickers, sp500Symbol, nasdaqSymbol, vxusSymbol])
   );
   const normWeights = resolveNormalizedWeights(userTickers, customWeights);
+  const mixWeights = benchmarkMix
+    ? resolveNormalizedWeights(Object.keys(benchmarkMix), benchmarkMix)
+    : null;
   const capital = initialCapital > 0 ? initialCapital : 10000;
 
   return series.map((point) => {
@@ -114,6 +149,15 @@ export function buildNormalizedChartData(
       } else {
         row[PORTFOLIO_KEY] = Number((capital * portfolioRatio).toFixed(2));
       }
+    }
+
+    // Combined (blended) benchmark across the market indices
+    if (mixWeights) {
+      const mixRatio = basketRatio(point.prices, basePrices, mixWeights);
+      row[COMBINED_BENCH_KEY] =
+        metric === 'percentage'
+          ? Number(((mixRatio - 1) * 100).toFixed(2))
+          : Number((capital * mixRatio).toFixed(2));
     }
 
     return row;
@@ -212,7 +256,8 @@ export function computePerformanceTable(
   nasdaqSymbol: string,
   vxusSymbol: string,
   customWeights?: Record<string, number>,
-  initialCapital: number = 10000
+  initialCapital: number = 10000,
+  benchmarkMix?: BenchmarkMix
 ): PerformanceRow[] {
   if (!series || series.length === 0) return [];
 
@@ -351,6 +396,29 @@ export function computePerformanceTable(
     volatilityPct: vxusMetrics.volatilityPct,
     alphaVsSp500Pct: vxusMetrics.totalReturnPct - sp500TotalReturn,
   });
+
+  // 6. Combined (blended) Benchmark
+  if (benchmarkMix) {
+    const mixWeights = resolveNormalizedWeights(Object.keys(benchmarkMix), benchmarkMix);
+    const basePrices = series[0].prices;
+    const mixValues = series.map((pt) => capital * basketRatio(pt.prices, basePrices, mixWeights));
+    const mixMetrics = computeTrajectoryMetrics(mixValues, calendarDays);
+    rows.push({
+      symbol: COMBINED_BENCH_KEY,
+      label: `Combined (${describeBenchmarkMix(benchmarkMix)})`,
+      type: 'benchmark',
+      color: COMBINED_BENCH_COLOR,
+      initialDollar: capital,
+      finalDollar: mixMetrics.endPrice,
+      startPrice: mixMetrics.startPrice,
+      endPrice: mixMetrics.endPrice,
+      totalReturnPct: mixMetrics.totalReturnPct,
+      cagrPct: mixMetrics.cagrPct,
+      maxDrawdownPct: mixMetrics.maxDrawdownPct,
+      volatilityPct: mixMetrics.volatilityPct,
+      alphaVsSp500Pct: mixMetrics.totalReturnPct - sp500TotalReturn,
+    });
+  }
 
   return rows;
 }
