@@ -119,7 +119,7 @@ export default function HomePage() {
         if (json.invalidTickers && json.invalidTickers.length > 0) {
           const badList = json.invalidTickers.join(', ');
           setInvalidTickerNotice(
-            `Ticker${json.invalidTickers.length > 1 ? 's' : ''} not available and removed: ${badList}. To add new stocks, list them in tickers.txt in the GitHub repo.`
+            `Ticker${json.invalidTickers.length > 1 ? 's' : ''} not found and removed: ${badList}. Check the symbol (Yahoo Finance format, e.g. BRK-B, TEVA.TA) and try again.`
           );
           setTickers((prev) => {
             const next = prev.filter((t) => !json.invalidTickers!.includes(t));
